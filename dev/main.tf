@@ -155,6 +155,9 @@ resource "aws_launch_template" "main" {
     systemctl enable nginx
   EOF
   )
+  iam_instance_profile {
+  name = aws_iam_instance_profile.ec2_profile.name
+  }
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-lt"
@@ -192,5 +195,69 @@ resource "aws_autoscaling_group" "main" {
     key                 = "ManagedBy"
     value               = "terraform"
     propagate_at_launch = true
+  }
+}
+# EC2 Assume role
+resource "aws_iam_role" "ec2_role" {
+  name = "${var.project_name}-${var.environment}-ec2-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-ec2-role"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+# Assume role policy for cloudwatch
+resource "aws_iam_policy" "ec2_cloudwatch_policy" {
+  name = "${var.project_name}-${var.environment}-ec2-cloudwatch-policy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-ec2-cloudwatch-policy"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+# EC2 role and policy attachment 
+resource "aws_iam_role_policy_attachment" "ec2_cloudwatch" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.ec2_cloudwatch_policy.arn
+}
+# Instance ec2 profile
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "${var.project_name}-${var.environment}-ec2-profile"
+  role = aws_iam_role.ec2_role.name
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-ec2-profile"
+    Environment = var.environment
+    ManagedBy   = "terraform"
   }
 }
