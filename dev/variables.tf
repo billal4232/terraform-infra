@@ -46,3 +46,9 @@ variable "instance_type" {
   description = "EC2 instance type"
   type        = string
 }
+variable "db_username" {
+  description = "Username for RDS"
+}
+variable "db_password" {
+  description = "Password for RDS"  
+}
