@@ -261,3 +261,85 @@ resource "aws_iam_instance_profile" "ec2_profile" {
     ManagedBy   = "terraform"
   }
 }
+# s3 bucket
+resource "aws_s3_bucket" "main" {
+  bucket = "${var.project_name}-${var.environment}-assets"
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-assets"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+# s3 bucket versioning 
+resource "aws_s3_bucket_versioning" "versioning_s3" {
+  bucket = aws_s3_bucket.main.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+# s3 bucket public access block
+resource "aws_s3_bucket_public_access_block" "s3_public_block" {
+  bucket = aws_s3_bucket.main.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+# Private subnet group for RDS
+resource "aws_db_subnet_group" "main" {
+  name       = "${var.project_name}-${var.environment}-db-subnet-group"
+  subnet_ids = [module.vpc.private_subnet_1a_id, module.vpc.private_subnet_1b_id]
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-db-subnet-group"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+# RDS databse 
+resource "aws_db_instance" "main" {
+  identifier        = "${var.project_name}-${var.environment}-rds"
+  engine            = "mysql"
+  engine_version    = "8.0"
+  instance_class    = "db.t3.micro"
+  allocated_storage = 20
+  username          = var.db_username
+  password          = var.db_password
+
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
+
+  skip_final_snapshot = true
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-rds"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+# RDS security group
+resource "aws_security_group" "rds_sg" {
+  name       = "${var.project_name}-${var.environment}-rds-security-group"
+  vpc_id = module.vpc.vpc_id
+
+  ingress {
+    protocol  = "tcp"
+    from_port = 3306
+    to_port   = 3306
+    security_groups = [aws_security_group.ec2_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-rds-sg"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
