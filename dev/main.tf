@@ -343,3 +343,54 @@ resource "aws_security_group" "rds_sg" {
     ManagedBy   = "terraform"
   }
 }
+# Cloudwatch logs group
+resource "aws_cloudwatch_log_group" "main" {
+  name              = "/${var.project_name}/${var.environment}/nginx"
+  retention_in_days = 30
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-log-group"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+# Cloudwatch metric alarm 
+resource "aws_cloudwatch_metric_alarm" "high_cpu" {
+  alarm_name          = "${var.project_name}-${var.environment}-high-cpu"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = 120
+  statistic           = "Average"
+  threshold           = 80
+  alarm_description   = "Triggers when CPU exceeds 80% for 4 minutes"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.main.name
+  }
+  #Commenting out the alarm action because i am not creating auto scaling now
+  #alarm_actions = [aws_autoscaling_policy.scale_out.arn]
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-high-cpu"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+# Fetched existing hosted zone id which i created earlier. 
+data "aws_route53_zone" "main" {
+  name = "aws.limonlab.online"
+ }
+ #Route53 record 
+ resource "aws_route53_record" "app" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "aws.${var.project_name}.online"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.main.dns_name
+    zone_id                = aws_lb.main.zone_id
+    evaluate_target_health = true
+  }
+}
