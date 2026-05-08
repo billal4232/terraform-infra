@@ -1,4 +1,4 @@
-# terraform-infra
+# terraform-multi-env-vpc
 
 Production-grade AWS infrastructure built with Terraform, using a modular approach for multi-environment deployments.
 
